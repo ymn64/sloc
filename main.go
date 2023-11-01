@@ -29,13 +29,16 @@ var commentStrings = map[string]commentString{
 	".c":    {"//", "/*", "*/"},
 	".css":  {"", "/*", "*/"},
 	".go":   {"//", "/*", "*/"},
+	".h":    {"//", "/*", "*/"},
 	".html": {"", "<!--", "-->"},
 	".js":   {"//", "/*", "*/"},
 	".jsx":  {"//", "/*", "*/"}, // TODO: comments within JSX blocks
 	".lua":  {"--", "--[[", "]]"},
 	".py":   {"#", "\"\"\"", "\"\"\""},
+	".scm":  {";", "", ""},
 	".scss": {"//", "/*", "*/"},
 	".sh":   {"#", "", ""},
+	".tex":  {"%", "", ""},
 	".ts":   {"//", "/*", "*/"},
 	".tsx":  {"//", "/*", "*/"},
 }
@@ -105,10 +108,13 @@ func walk(root string) ([]item, int, int, error) {
 			}
 			// TODO: improve this
 			if !errors.Is(err, errUnsupportedFiletype) {
-				relativePath, _ := filepath.Rel(root, path) // TODO: handle error
-				items = append(items, item{relativePath, lines})
+				rel, err := filepath.Rel(root, path) // TODO: handle error
+				if err != nil {
+					return err
+				}
+				items = append(items, item{rel, lines})
 				total += lines
-				if l := len(relativePath); l > pathMaxLen {
+				if l := len(rel); l > pathMaxLen {
 					pathMaxLen = l
 				}
 
@@ -136,27 +142,31 @@ func intlen(n int) int {
 }
 
 func print(items []item, total int, pathMaxLen int) {
+	gray := "\033[38;5;8m"
+	reset := "\033[0m"
+
 	slocMaxLen := intlen(total)
 
 	printItem := func(path string, sloc int) {
 		pathPad := strings.Repeat(" ", pathMaxLen-len(path))
 		slocPad := strings.Repeat(" ", slocMaxLen-intlen(sloc))
-		fmt.Printf("│ %s%s │ %d%s │\n", path, pathPad, sloc, slocPad)
+		vLine := gray + "│" + reset
+		fmt.Printf("%s %s%s %s %d%s %s\n", vLine, path, pathPad, vLine, sloc, slocPad, vLine)
 	}
 
 	pathHLine := strings.Repeat("─", pathMaxLen)
 	slocHLine := strings.Repeat("─", slocMaxLen)
-	fmt.Printf("┌─%s─┬─%s─┐\n", pathHLine, slocHLine)
+	fmt.Printf("%s┌─%s─┬─%s─┐%s\n", gray, pathHLine, slocHLine, reset)
 
 	for _, item := range items {
 		printItem(item.path, item.sloc)
 	}
 
-	fmt.Printf("├─%s─┼─%s─┤\n", pathHLine, slocHLine)
+	fmt.Printf("%s├─%s─┼─%s─┤%s\n", gray, pathHLine, slocHLine, reset)
 
 	printItem("Total", total)
 
-	fmt.Printf("└─%s─┴─%s─┘\n", pathHLine, slocHLine)
+	fmt.Printf("%s└─%s─┴─%s─┘%s\n", gray, pathHLine, slocHLine, reset)
 }
 
 func main() {
@@ -177,6 +187,10 @@ func main() {
 	items, total, pathMaxLen, err := walk(root)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if total == 0 {
+		os.Exit(0)
 	}
 
 	print(items, total, pathMaxLen)
