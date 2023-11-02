@@ -15,38 +15,63 @@ import (
 
 var ignore = []string{
 	"node_modules",
+	"coverage",
 	".git",
 	".next",
 }
 
-type commentString struct {
+const (
+	none    = "\033[37m"
+	red     = "\033[31m"
+	green   = "\033[32m"
+	yellow  = "\033[33m"
+	blue    = "\033[34m"
+	magenta = "\033[35m"
+	cyan    = "\033[36m"
+	reset   = "\033[0m"
+)
+
+type langInfo struct {
 	inline string
 	start  string
 	end    string
+	icon   string
+	color  string
 }
 
-var commentStrings = map[string]commentString{
-	".c":    {"//", "/*", "*/"},
-	".css":  {"", "/*", "*/"},
-	".go":   {"//", "/*", "*/"},
-	".h":    {"//", "/*", "*/"},
-	".html": {"", "<!--", "-->"},
-	".js":   {"//", "/*", "*/"},
-	".jsx":  {"//", "/*", "*/"}, // TODO: comments within JSX blocks
-	".lua":  {"--", "--[[", "]]"},
-	".py":   {"#", "\"\"\"", "\"\"\""},
-	".scm":  {";", "", ""},
-	".scss": {"//", "/*", "*/"},
-	".sh":   {"#", "", ""},
-	".tex":  {"%", "", ""},
-	".ts":   {"//", "/*", "*/"},
-	".tsx":  {"//", "/*", "*/"},
+var supported = map[string]langInfo{
+	".c":    {"//", "/*", "*/", " ", none},
+	".css":  {"", "/*", "*/", " ", blue},
+	".go":   {"//", "/*", "*/", " ", cyan},
+	".h":    {"//", "/*", "*/", " ", blue},
+	".html": {"", "<!--", "-->", " ", red},
+	".js":   {"//", "/*", "*/", " ", yellow},
+	".jsx":  {"//", "/*", "*/", " ", cyan}, // TODO: comments within JSX blocks
+	".lua":  {"--", "--[[", "]]", " ", blue},
+	".py":   {"#", "\"\"\"", "\"\"\"", " ", yellow},
+	".scm":  {";", "", "", " ", none},
+	".scss": {"//", "/*", "*/", " ", magenta},
+	".sh":   {"#", "", "", " ", green},
+	".tex":  {"%", "", "", " ", none},
+	".ts":   {"//", "/*", "*/", " ", blue},
+	".tsx":  {"//", "/*", "*/", " ", blue},
+	".vim":  {"\"", "", "", " ", green},
+	".zsh":  {"#", "", "", " ", green},
+}
+
+func icon(ext string) string {
+	lang, ok := supported[ext]
+	if ok {
+		return lang.color + lang.icon + " " + reset
+	}
+
+	return "   "
 }
 
 var errUnsupportedFiletype = errors.New("unsupported filetype")
 
 func sloc(filePath string) (int, error) {
-	commStr, ok := commentStrings[filepath.Ext(filePath)]
+	commStr, ok := supported[filepath.Ext(filePath)]
 	if !ok {
 		return 0, fmt.Errorf("%s: %w", filePath, errUnsupportedFiletype)
 	}
@@ -154,10 +179,11 @@ func print(items []item, total int, pathMaxLen int) {
 		pathPad := strings.Repeat(" ", pathMaxLen-len(path))
 		slocPad := strings.Repeat(" ", slocMaxLen-intlen(sloc))
 		vLine := gray + "│" + reset
+		path = icon(filepath.Ext(path)) + path
 		fmt.Printf("%s %s%s %s %d%s %s\n", vLine, path, pathPad, vLine, sloc, slocPad, vLine)
 	}
 
-	pathHLine := strings.Repeat("─", pathMaxLen)
+	pathHLine := strings.Repeat("─", pathMaxLen+3)
 	slocHLine := strings.Repeat("─", slocMaxLen)
 	fmt.Printf("%s┌─%s─┬─%s─┐%s\n", gray, pathHLine, slocHLine, reset)
 
@@ -174,6 +200,7 @@ func print(items []item, total int, pathMaxLen int) {
 
 func main() {
 	ignoreFlag := flag.String("i", "", "List of entries to ignore (comma separated)")
+	briefFlag := flag.Bool("b", false, "Print only the total")
 	flag.Parse()
 
 	for _, entry := range strings.Split(*ignoreFlag, ",") {
@@ -192,9 +219,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if total == 0 {
+	if len(items) == 0 {
 		os.Exit(0)
 	}
 
-	print(items, total, pathMaxLen)
+	if *briefFlag {
+		fmt.Println(total)
+	} else {
+		print(items, total, max(len("Total"), pathMaxLen))
+	}
 }
