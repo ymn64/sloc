@@ -98,7 +98,10 @@ func walk(root string) ([]item, int, int, error) {
 		}
 
 		if slices.Contains(ignore, filepath.Base(path)) {
-			return filepath.SkipDir
+			if dirEntry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		if dirEntry.Type().IsRegular() && !dirEntry.IsDir() {
