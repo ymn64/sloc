@@ -1,4 +1,4 @@
-module github.com/devkvlt/sloc
+module github.com/ymn64/sloc
 
 go 1.21.2
 
